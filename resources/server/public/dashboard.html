@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QClaw 控制中心</title>
+<style>
+  :root {
+    --bg: #0f0f17;
+    --bg2: #16161f;
+    --bg3: #1e1e2e;
+    --border: #2a2a3e;
+    --accent: #7c6af7;
+    --accent2: #5b8af7;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --card-shadow: 0 2px 16px rgba(0,0,0,.4);
+    --sidebar-w: 220px;
+    --transition: .15s ease;
+  }
+  .light-theme {
+    --bg: #f5f5ff;
+    --bg2: #eeeeff;
+    --bg3: #fff;
+    --border: #d0d0e8;
+    --text: #1e1e3e;
+    --text2: #555577;
+    --card-shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: var(--sidebar-w); min-width: var(--sidebar-w); background: var(--bg2);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    height: 100vh; position: sticky; top: 0; transition: width .2s ease, min-width .2s ease;
+    overflow: hidden;
+  }
+  #sidebar.collapsed { width: 56px; min-width: 56px; }
+  .logo {
+    padding: 16px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    white-space: nowrap; overflow: hidden;
+  }
+  .logo-text { overflow: hidden; }
+  .logo h1 { font-size: 17px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+  .logo .version { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  #sidebar.collapsed .logo-text { display: none; }
+  .sidebar-toggle {
+    background: none; border: none; cursor: pointer; color: var(--text2);
+    font-size: 16px; padding: 4px; border-radius: 4px; flex-shrink: 0;
+    transition: color var(--transition);
+  }
+  .sidebar-toggle:hover { color: var(--text); }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 11px 18px;
+    cursor: pointer; border-left: 3px solid transparent; transition: all var(--transition);
+    font-size: 13.5px; color: var(--text2); user-select: none; white-space: nowrap;
+    overflow: hidden; position: relative;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--bg3); color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+  .nav-item .nav-label { transition: opacity .15s; }
+  #sidebar.collapsed .nav-label { opacity: 0; pointer-events: none; }
+  #sidebar.collapsed .nav-item { padding-left: 18px; }
+
+  /* Tooltip for collapsed sidebar */
+  #sidebar.collapsed .nav-item:hover::after {
+    content: attr(data-label);
+    position: absolute; left: 60px; top: 50%; transform: translateY(-50%);
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+    padding: 4px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap;
+    z-index: 1000; pointer-events: none;
+  }
+
+  .sidebar-footer { margin-top: auto; padding: 14px 18px; border-top: 1px solid var(--border); overflow: hidden; }
+  #sidebar.collapsed .sidebar-footer { padding: 14px 10px; }
+  #gateway-pill {
+    display: flex; align-items: center; gap: 6px; font-size: 12px;
+    padding: 5px 10px; border-radius: 20px; background: var(--bg3);
+    border: 1px solid var(--border); cursor: pointer; transition: .2s;
+    white-space: nowrap; overflow: hidden;
+  }
+  #gateway-pill:hover { border-color: var(--accent); }
+  #sidebar.collapsed #gateway-pill { padding: 5px 8px; }
+  #sidebar.collapsed #gateway-text { display: none; }
+  #gateway-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text2); flex-shrink: 0; }
+  #gateway-dot.online  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #gateway-dot.offline { background: var(--red); }
+  .footer-btns { display: flex; gap: 8px; margin-top: 10px; }
+  #sidebar.collapsed .footer-btns .btn-label { display: none; }
+
+  /* ── Main ── */
+  #main { flex: 1; overflow-y: auto; padding: 24px 28px; height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Header row ── */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+  .page-header h2 { font-size: 20px; font-weight: 700; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  /* ── Cards ── */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; box-shadow: var(--card-shadow); transition: border-color var(--transition);
+  }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-card .label { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+  .stat-card .value { font-size: 26px; font-weight: 700; color: var(--text); }
+  .stat-card .sub   { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+  /* ── Agent Cards ── */
+  .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .agent-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 20px; box-shadow: var(--card-shadow); transition: border-color .2s, transform .15s;
+  }
+  .agent-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .agent-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .agent-emoji { font-size: 28px; }
+  .agent-info h3 { font-size: 15px; font-weight: 600; }
+  .agent-info .model { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .agent-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+  }
+  .badge.running { background: rgba(74,222,128,.12); border-color: var(--green); color: var(--green); }
+  .badge.idle    { background: rgba(148,163,184,.1); }
+  .badge.error   { background: rgba(248,113,113,.12); border-color: var(--red); color: var(--red); }
+
+  /* ── Table ── */
+  .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--bg3); padding: 11px 14px; text-align: left; font-weight: 600; font-size: 12px; color: var(--text2); border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(124,106,247,.04); }
+
+  /* ── Chart ── */
+  .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+  .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text2); }
+  .chart-bar-wrap { display: flex; align-items: flex-end; gap: 6px; height: 120px; }
+  .chart-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+  .chart-bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--accent); min-height: 4px; transition: height .3s; opacity: .85; }
+  .chart-label { font-size: 10px; color: var(--text2); }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* ── Skills ── */
+  .skill-list { display: flex; flex-direction: column; gap: 10px; }
+  .skill-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px;
+    transition: border-color var(--transition);
+  }
+  .skill-item:hover { border-color: var(--accent); }
+  .skill-item .skill-left { display: flex; align-items: center; gap: 12px; }
+  .skill-icon { font-size: 20px; }
+  .skill-name { font-weight: 600; font-size: 14px; }
+  .skill-desc { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .toggle-btn {
+    padding: 5px 14px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 12px; font-weight: 600; transition: .2s; min-width: 56px;
+  }
+  .toggle-btn.on  { background: rgba(74,222,128,.15); color: var(--green); border: 1px solid rgba(74,222,128,.3); }
+  .toggle-btn.off { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+  .toggle-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── Alert Center ── */
+  .alert-form { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
+  .form-group label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 5px; }
+  .form-group input, .form-group select {
+    width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text); font-size: 13px; outline: none; transition: border-color var(--transition);
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+  .btn {
+    padding: 8px 16px; border-radius: 7px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: .15s; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { opacity: .85; }
+  .btn-ghost { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+  .btn-danger { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+  .btn-danger:hover:not(:disabled) { background: rgba(248,113,113,.25); }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+  /* ── Alert History ── */
+  .alert-history-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+  .alert-history-item {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;
+    font-size: 12px;
+  }
+  .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .alert-dot.error  { background: var(--red); }
+  .alert-dot.warn   { background: var(--yellow); }
+  .alert-dot.test   { background: var(--accent); }
+
+  /* ── Pixel Office ── */
+  #pixel-canvas-wrap {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; position: relative; height: 400px; margin-bottom: 20px;
+    background-image: repeating-linear-gradient(
+      0deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px
+    ),
+    repeating-linear-gradient(
+      90deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px
+    );
+  }
+  .pixel-agent {
+    position: absolute; font-size: 22px; cursor: default;
+    transition: left .8s ease, top .8s ease;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));
+    animation: pixel-bob 2s infinite;
+  }
+  .pixel-agent.idle    { animation: none; opacity: .75; }
+  .pixel-agent.running { animation: pixel-bob 1.2s infinite; }
+  @keyframes pixel-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .pixel-furniture { position: absolute; font-size: 24px; opacity: .8; }
+  .pixel-name {
+    position: absolute; background: rgba(0,0,0,.7); color: #fff;
+    font-size: 9px; padding: 1px 5px; border-radius: 3px;
+    white-space: nowrap; transform: translate(-50%, 26px);
+  }
+  .pixel-floor {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+    background: linear-gradient(to top, rgba(124,106,247,.12), transparent);
+  }
+
+  /* ── Refresh / Period Controls ── */
+  .select-sm {
+    padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text); font-size: 12px; cursor: pointer; outline: none;
+  }
+  .select-sm:focus { border-color: var(--accent); }
+
+  /* ── Search box ── */
+  .search-box {
+    padding: 7px 12px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text); font-size: 13px; outline: none; width: 220px;
+    transition: border-color var(--transition);
+  }
+  .search-box:focus { border-color: var(--accent); }
+
+  /* ── Loading / Empty ── */
+  .loading { text-align: center; padding: 40px; color: var(--text2); }
+  .empty   { text-align: center; padding: 40px; color: var(--text2); font-size: 14px; }
+  .spin    { display: inline-block; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Toast Notifications ── */
+  #toast-container {
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  }
+  .toast {
+    padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    backdrop-filter: blur(10px); border: 1px solid; min-width: 240px; max-width: 380px;
+    display: flex; align-items: center; gap: 8px;
+    animation: toast-in .25s ease; pointer-events: all;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  }
+  .toast.success { background: rgba(74,222,128,.15); border-color: var(--green); color: var(--green); }
+  .toast.error   { background: rgba(248,113,113,.15); border-color: var(--red);   color: var(--red);   }
+  .toast.info    { background: rgba(124,106,247,.15); border-color: var(--accent);color: var(--accent); }
+  .toast.warn    { background: rgba(251,191,36,.15);  border-color: var(--yellow);color: var(--yellow); }
+  .toast-close { margin-left: auto; cursor: pointer; opacity: .7; font-size: 15px; }
+  .toast-close:hover { opacity: 1; }
+  @keyframes toast-in  { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+  @keyframes toast-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(30px); } }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 8000;
+    display: flex; align-items: center; justify-content: center;
+    animation: fade-in .2s ease;
+  }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
+    padding: 24px 28px; min-width: 360px; max-width: 560px; width: 90%;
+    box-shadow: 0 8px 40px rgba(0,0,0,.6); animation: modal-in .2s ease;
+  }
+  @keyframes modal-in { from { opacity: 0; transform: scale(.95) translateY(-10px); } to { opacity: 1; transform: none; } }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .modal-header h3 { font-size: 16px; font-weight: 700; }
+  .modal-close { background: none; border: none; cursor: pointer; color: var(--text2); font-size: 20px; }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { font-size: 13px; line-height: 1.7; color: var(--text2); }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  /* ── Inline results ── */
+  .inline-result {
+    border-radius: 10px; padding: 12px 16px; font-size: 12.5px; line-height: 1.7;
+    border: 1px solid; margin-top: 12px;
+  }
+  .inline-result.success { background: rgba(74,222,128,.08); border-color: rgba(74,222,128,.3); }
+  .inline-result.error   { background: rgba(248,113,113,.08); border-color: rgba(248,113,113,.3); }
+  .inline-result.info    { background: rgba(124,106,247,.08); border-color: rgba(124,106,247,.3); }
+
+  /* ── Evolution Styles ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .evo-issue-item {
+    display:flex;gap:8px;align-items:flex-start;padding:8px 16px;border-bottom:1px solid var(--border);
+    font-size:12px;line-height:1.5;
+  }
+  .evo-issue-item:last-child { border-bottom: none; }
+  .evo-severity-warn  { color:var(--yellow); font-size:16px; }
+  .evo-severity-info  { color:var(--accent2); font-size:16px; }
+  .evo-advice-item {
+    display:flex;gap:8px;align-items:flex-start;padding:8px 16px;border-bottom:1px solid var(--border);
+    font-size:12px;line-height:1.5;
+  }
+  .evo-advice-item:last-child { border-bottom: none; }
+  .evo-priority-high   { background:#fbbf2422;border-left:3px solid var(--yellow); }
+  .evo-priority-medium { background:#7c6af722;border-left:3px solid var(--accent); }
+  .evo-priority-low    { background:var(--bg3);border-left:3px solid var(--border); }
+  .evo-log-entry { display:flex;gap:8px;margin-bottom:2px; }
+  .evo-log-ts   { color:var(--text2);min-width:80px; }
+  .evo-log-type { color:var(--accent);min-width:60px; }
+  .evo-log-fix  { color:var(--green); }
+  .evo-log-err  { color:var(--red); }
+  .evo-log-warn { color:var(--yellow); }
+
+  /* ── Gateway Modal ── */
+  .gw-stat { display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px; }
+  .gw-stat:last-child { border-bottom:none; }
+  .gw-stat .key { color: var(--text2); }
+
+  /* ── Keyboard shortcut hint ── */
+  kbd {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; font-size: 11px; color: var(--text2); font-family: inherit;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ Toast 容器 ═══════════ -->
+<div id="toast-container"></div>
+
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<nav id="sidebar">
+  <div class="logo">
+    <div class="logo-text">
+      <h1>⚡ QClaw</h1>
+      <div class="version" id="sidebar-version">控制中心 ...</div>
+    </div>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="折叠侧边栏 [Ctrl+B]">◀</button>
+  </div>
+
+  <div class="nav-item active" onclick="navigate('overview')"  id="nav-overview"  data-label="总览">    <span class="icon">🏠</span><span class="nav-label"> 总览</span></div>
+  <div class="nav-item"        onclick="navigate('agents')"    id="nav-agents"    data-label="机器人">  <span class="icon">🤖</span><span class="nav-label"> 机器人</span></div>
+  <div class="nav-item"        onclick="navigate('models')"    id="nav-models"    data-label="模型">    <span class="icon">🧠</span><span class="nav-label"> 模型</span></div>
+  <div class="nav-item"        onclick="navigate('sessions')"  id="nav-sessions"  data-label="会话">    <span class="icon">💬</span><span class="nav-label"> 会话</span></div>
+  <div class="nav-item"        onclick="navigate('stats')"     id="nav-stats"     data-label="统计">    <span class="icon">📊</span><span class="nav-label"> 统计</span></div>
+  <div class="nav-item"        onclick="navigate('skills')"    id="nav-skills"    data-label="技能">    <span class="icon">🔧</span><span class="nav-label"> 技能</span></div>
+  <div class="nav-item"        onclick="navigate('alerts')"    id="nav-alerts"    data-label="告警">    <span class="icon">🔔</span><span class="nav-label"> 告警</span></div>
+  <div class="nav-item"        onclick="navigate('pixel')"     id="nav-pixel"     data-label="像素办公室"><span class="icon">🕹️</span><span class="nav-label"> 像素办公室</span></div>
+  <div class="nav-item"        onclick="navigate('evolution')" id="nav-evolution" data-label="进化中心"><span class="icon">🧬</span><span class="nav-label"> 进化中心</span></div>
+  <div class="nav-item"        onclick="navigate('settings')"  id="nav-settings"  data-label="设置">    <span class="icon">⚙️</span><span class="nav-label"> 设置</span></div>
+
+  <div class="sidebar-footer">
+    <div id="gateway-pill" onclick="showGatewayModal()" title="点击查看 Gateway 详情">
+      <div id="gateway-dot"></div>
+      <span id="gateway-text">Gateway 检测中...</span>
+    </div>
+    <div class="footer-btns">
+      <button class="btn btn-ghost btn-sm" onclick="toggleTheme()" title="切换主题 [Ctrl+D]">🌓 <span class="btn-label">主题</span></button>
+      <button class="btn btn-ghost btn-sm" onclick="cycleRefresh()" title="切换刷新频率">⏱ <span class="btn-label">刷新</span></button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleLang()" title="切换语言 [Ctrl+L]" id="btn-lang">EN</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<main id="main">
+
+  <!-- 总览 -->
+  <div class="page active" id="page-overview">
+    <div class="page-header">
+      <h2>🏠 总览</h2>
+      <div class="header-actions">
+        <select class="select-sm" id="refresh-select" onchange="updateRefreshInterval()">
+          <option value="0">手动刷新</option>
+          <option value="10000">10 秒</option>
+          <option value="30000" selected>30 秒</option>
+          <option value="60000">1 分钟</option>
+          <option value="300000">5 分钟</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadOverview()" id="btn-refresh-overview">↻ 刷新</button>
+      </div>
+    </div>
+
+    <div class="cards-grid" id="overview-cards">
+      <div class="stat-card"><div class="label">在线 Agent</div><div class="value" id="ov-agents">—</div><div class="sub">已配置</div></div>
+      <div class="stat-card"><div class="label">活跃会话</div><div class="value" id="ov-sessions">—</div><div class="sub">当前运行</div></div>
+      <div class="stat-card"><div class="label">今日 Token</div><div class="value" id="ov-tokens">—</div><div class="sub">消耗量</div></div>
+      <div class="stat-card"><div class="label">Gateway</div><div class="value" id="ov-gateway">—</div><div class="sub" id="ov-gateway-url">—</div></div>
+    </div>
+
+    <div id="overview-alerts-wrap" style="display:none;margin-bottom:20px;">
+      <div class="table-wrap" id="overview-alerts"></div>
+    </div>
+
+    <div class="chart-card">
+      <h3>近 7 天 Token 趋势</h3>
+      <div class="chart-bar-wrap" id="mini-chart"></div>
+    </div>
+
+    <div id="overview-digest" style="display:none;">
+      <div class="table-wrap" style="padding:16px 20px;">
+        <h3 style="font-size:14px;margin-bottom:10px;color:var(--text2)">最新摘要</h3>
+        <pre id="digest-content" style="font-size:12px;line-height:1.6;white-space:pre-wrap;color:var(--text2)"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 机器人 -->
+  <div class="page" id="page-agents">
+    <div class="page-header">
+      <h2>🤖 机器人总览</h2>
+      <button class="btn btn-ghost btn-sm" onclick="loadAgents()">↻ 刷新</button>
+    </div>
+    <div class="agents-grid" id="agents-grid">
+      <div class="loading"><span class="spin">⟳</span> 加载中...</div>
+    </div>
+  </div>
+
+  <!-- 模型 -->
+  <div class="page" id="page-models">
+    <div class="page-header">
+      <h2>🧠 模型列表</h2>
+      <button class="btn btn-ghost btn-sm" onclick="loadModels()">↻ 刷新</button>
+    </div>
+    <div class="table-wrap">
+      <table id="models-table">
+        <thead><tr><th>Provider</th><th>模型 ID</th><th>名称</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="models-tbody"><tr><td colspan="5" class="loading">加载中...</td></tr></tbody>
+      </table>
+    </div>
+    <div id="model-health-result" style="display:none;margin-top:12px;"></div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;" id="model-health-btns"></div>
+  </div>
+
+  <!-- 会话 -->
+  <div class="page" id="page-sessions">
+    <div class="page-header">
+      <h2>💬 会话管理</h2>
+      <div class="header-actions">
+        <select class="select-sm" id="session-type-filter" onchange="loadSessions()">
+          <option value="all">全部类型</option>
+          <option value="chat">私聊</option>
+          <option value="group">群聊</option>
+          <option value="scheduled">定时任务</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="testAllPlatforms()" id="btn-platform-test">🔌 平台测试</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadSessions()">↻ 刷新</button>
+      </div>
+    </div>
+    <div id="platform-test-result" style="display:none;margin-bottom:16px;"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>会话 ID</th><th>Agent</th><th>类型</th><th>消息数</th><th>Token</th><th>最后活动</th><th>操作</th></tr></thead>
+        <tbody id="sessions-tbody"><tr><td colspan="7" class="loading">加载中...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 统计 -->
+  <div class="page" id="page-stats">
+    <div class="page-header">
+      <h2>📊 消息统计</h2>
+      <div class="header-actions">
+        <select class="select-sm" id="period-select" onchange="loadStats()">
+          <option value="day">今天</option>
+          <option value="week" selected>本周</option>
+          <option value="month">本月</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadStats()">↻ 刷新</button>
+      </div>
+    </div>
+
+    <div class="cards-grid" id="stats-cards">
+      <div class="stat-card"><div class="label">总 Token 消耗</div><div class="value" id="s-total">—</div></div>
+      <div class="stat-card"><div class="label">平均响应时间</div><div class="value" id="s-rt">—</div><div class="sub">毫秒</div></div>
+      <div class="stat-card"><div class="label">峰值日期</div><div class="value" id="s-peak" style="font-size:16px">—</div></div>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>📈 Token 消耗趋势</h3>
+        <div class="chart-bar-wrap" id="token-chart"></div>
+      </div>
+      <div class="chart-card">
+        <h3>⏱ 响应时间趋势 (ms)</h3>
+        <div class="chart-bar-wrap" id="rt-chart"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 技能 -->
+  <div class="page" id="page-skills">
+    <div class="page-header">
+      <h2>🔧 技能管理</h2>
+      <div class="header-actions">
+        <input class="search-box" type="text" id="skill-search" placeholder="搜索技能..." oninput="loadSkills()">
+        <select class="select-sm" id="skill-type-filter" onchange="loadSkills()">
+          <option value="all">全部</option>
+          <option value="builtin">内置</option>
+          <option value="extension">扩展</option>
+          <option value="custom">自定义</option>
+        </select>
+      </div>
+    </div>
+    <div id="skills-summary" style="display:flex;gap:10px;margin-bottom:16px;"></div>
+    <div class="skill-list" id="skills-list">
+      <div class="loading">加载中...</div>
+    </div>
+  </div>
+
+  <!-- 告警 -->
+  <div class="page" id="page-alerts">
+    <div class="page-header">
+      <h2>🔔 告警中心</h2>
+      <button class="btn btn-ghost btn-sm" onclick="loadAlerts()">↻ 刷新</button>
+    </div>
+
+    <div class="alert-form">
+      <h3 style="font-size:14px;margin-bottom:12px;">新增告警规则</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>规则名称</label>
+          <input type="text" id="alert-name" placeholder="如：模型超时告警" onkeydown="if(event.key==='Enter')addAlertRule()">
+        </div>
+        <div class="form-group">
+          <label>触发条件</label>
+          <select id="alert-condition">
+            <option value="model_unavailable">模型不可用</option>
+            <option value="bot_unresponsive">机器人无响应</option>
+            <option value="gateway_offline">Gateway 离线</option>
+            <option value="high_token_usage">Token 用量过高</option>
+            <option value="error_rate_high">错误率过高</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>通知渠道</label>
+          <select id="alert-channel">
+            <option value="feishu">飞书</option>
+            <option value="discord">Discord</option>
+            <option value="email">邮件</option>
+            <option value="log">仅记录</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="addAlertRule()" id="btn-add-alert">+ 添加</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <h3 style="font-size:14px;margin-bottom:12px;color:var(--text2)">告警规则</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>名称</th><th>触发条件</th><th>渠道</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+          <tbody id="alert-rules-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="font-size:14px;margin-bottom:12px;color:var(--text2)">触发历史</h3>
+      <div class="alert-history-list" id="alert-history-list">
+        <div class="empty">暂无触发历史</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 像素办公室 -->
+  <div class="page" id="page-pixel">
+    <div class="page-header">
+      <h2>🕹️ 像素办公室</h2>
+      <button class="btn btn-ghost btn-sm" onclick="loadPixelOffice()">↻ 刷新</button>
+    </div>
+    <div id="pixel-canvas-wrap">
+      <div class="pixel-floor"></div>
+      <div id="pixel-agents-layer"></div>
+      <div id="pixel-furniture-layer"></div>
+    </div>
+    <div id="pixel-info" class="cards-grid"></div>
+  </div>
+
+  <!-- 进化中心 -->
+  <div class="page" id="page-evolution">
+    <div class="page-header">
+      <h2>🧬 进化中心</h2>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" id="evo-toggle-btn" onclick="toggleEvolution()">⏸ 停止引擎</button>
+        <button class="btn btn-primary btn-sm" onclick="triggerEvoScan()" id="evo-scan-btn">🔍 立即扫描</button>
+        <button class="btn btn-sm" style="background:var(--accent);color:#fff;" onclick="triggerEvoEvolve()" id="evo-evolve-btn">⚡ 触发进化</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadEvolution()">↻ 刷新</button>
+      </div>
+    </div>
+
+    <!-- 状态卡片 -->
+    <div class="cards-grid" id="evo-stat-cards">
+      <div class="stat-card">
+        <div class="label">🔄 引擎状态</div>
+        <div class="value" id="evo-running" style="font-size:18px">—</div>
+        <div class="sub" id="evo-version">版本 —</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">🔍 扫描次数</div>
+        <div class="value" id="evo-scans">—</div>
+        <div class="sub" id="evo-last-scan">上次扫描: —</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">⚠️ 待处理问题</div>
+        <div class="value" id="evo-issues" style="color:var(--yellow)">—</div>
+        <div class="sub" id="evo-patches">已打补丁: 0 次</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">💾 备份数量</div>
+        <div class="value" id="evo-backups">—</div>
+        <div class="sub">自动保留最近 50 个</div>
+      </div>
+    </div>
+
+    <!-- 进度提示 -->
+    <div id="evo-progress" style="display:none;padding:12px 16px;background:var(--bg2);border:1px solid var(--accent);border-radius:10px;margin-bottom:20px;color:var(--accent);font-size:13px;">
+      <span class="spin" style="display:inline-block;">⟳</span>
+      <span id="evo-progress-text"> 正在处理...</span>
+    </div>
+
+    <!-- 自动补丁开关 -->
+    <div class="table-wrap" style="padding:16px 20px;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;">🤖 自动补丁模式</div>
+          <div style="font-size:12px;color:var(--text2)">开启后，进化周期中将自动修复低风险问题（var→const/let、补充文件注释）</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="evo-auto-patch" onchange="updateEvoPatch()" style="width:16px;height:16px;cursor:pointer;">
+          <span style="font-size:12px;color:var(--text2)">自动修复</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 双栏：扫描结果 + AI 建议 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="table-wrap" style="padding:0;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;">
+          📋 最近扫描问题
+          <span id="evo-issues-badge" style="font-size:11px;color:var(--text2);font-weight:400;margin-left:8px;"></span>
+        </div>
+        <div id="evo-issues-list" style="max-height:340px;overflow-y:auto;padding:8px 0;">
+          <div class="empty" style="padding:20px;text-align:center;color:var(--text2)">点击"立即扫描"查看结果</div>
+        </div>
+      </div>
+      <div class="table-wrap" style="padding:0;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;">
+          💡 AI 改进建议
+          <span id="evo-advice-badge" style="font-size:11px;color:var(--text2);font-weight:400;margin-left:8px;"></span>
+        </div>
+        <div id="evo-advice-list" style="max-height:340px;overflow-y:auto;padding:8px 0;">
+          <div class="empty" style="padding:20px;text-align:center;color:var(--text2)">扫描后生成 AI 建议</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 进化历史 -->
+    <div class="table-wrap" style="margin-bottom:20px;">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;">
+        🕰️ 进化历史
+        <span style="font-size:11px;color:var(--text2);font-weight:400;margin-left:8px;">最近 20 次版本变更</span>
+      </div>
+      <table>
+        <thead><tr><th>版本</th><th>时间</th><th>变更摘要</th></tr></thead>
+        <tbody id="evo-history-tbody"><tr><td colspan="3" class="loading">加载中...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- 进化日志 -->
+    <div class="table-wrap">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:14px;font-weight:600;">📜 进化日志</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;">
+            <input type="checkbox" id="evo-log-autoscroll" checked style="cursor:pointer;"> 自动滚动
+          </label>
+          <span style="font-size:11px;color:var(--text2)">最近 50 条</span>
+        </div>
+      </div>
+      <div id="evo-log-list" style="max-height:300px;overflow-y:auto;font-family:monospace;font-size:11.5px;padding:8px 16px;line-height:1.8;">
+        <div class="empty">暂无日志</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══════════ Gateway Modal ═══════════ -->
+<div id="gateway-modal" class="modal-overlay" style="display:none;" onclick="closeGatewayModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3>🔌 Gateway 状态详情</h3>
+      <button class="modal-close" onclick="closeGatewayModal()">✕</button>
+    </div>
+    <div class="modal-body" id="gateway-modal-body">
+      <div class="loading">检测中...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeGatewayModal()">关闭</button>
+      <button class="btn btn-primary" onclick="refreshGatewayModal()">↻ 重新检测</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Confirm Modal ═══════════ -->
+<div id="confirm-modal" class="modal-overlay" style="display:none;" onclick="confirmModalCancel(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;">
+    <div class="modal-header">
+      <h3 id="confirm-title">确认操作</h3>
+      <button class="modal-close" onclick="confirmModalCancel()">✕</button>
+    </div>
+    <div class="modal-body" id="confirm-body" style="font-size:14px;color:var(--text);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="confirmModalCancel()">取消</button>
+      <button class="btn btn-primary" id="confirm-ok-btn" onclick="confirmModalOk()">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:3001';
+let _theme = 'dark';
+let _refreshTimer = null;
+let _currentPage = 'overview';
+let _sidebarCollapsed = false;
+let _gatewayData = null;
+let _confirmResolve = null;
+
+// ── Toast 通知系统 ────────────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3000) {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warn: '⚠️' };
+  el.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span style="flex:1">${msg}</span><span class="toast-close" onclick="this.parentElement.remove()">✕</span>`;
+  container.appendChild(el);
+  if (duration > 0) {
+    setTimeout(() => {
+      el.style.animation = 'toast-out .25s ease forwards';
+      setTimeout(() => el.remove(), 250);
+    }, duration);
+  }
+  return el;
+}
+
+// ── 自定义 Confirm Modal ──────────────────────────────────────────────────────
+function showConfirm(title, body, okLabel = '确认', okClass = 'btn-primary') {
+  return new Promise((resolve) => {
+    _confirmResolve = resolve;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-body').textContent = body;
+    const okBtn = document.getElementById('confirm-ok-btn');
+    okBtn.textContent = okLabel;
+    okBtn.className = `btn ${okClass}`;
+    document.getElementById('confirm-modal').style.display = 'flex';
+  });
+}
+function confirmModalOk() {
+  document.getElementById('confirm-modal').style.display = 'none';
+  if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+}
+function confirmModalCancel(e) {
+  if (e && e.target !== document.getElementById('confirm-modal')) return;
+  document.getElementById('confirm-modal').style.display = 'none';
+  if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+}
+
+// ── 导航 ──────────────────────────────────────────────────────────────────────
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('nav-' + page).classList.add('active');
+  _currentPage = page;
+
+  if (page === 'overview')  loadOverview();
+  if (page === 'agents')    loadAgents();
+  if (page === 'models')    loadModels();
+  if (page === 'sessions')  loadSessions();
+  if (page === 'stats')     loadStats();
+  if (page === 'skills')    loadSkills();
+  if (page === 'alerts')    loadAlerts();
+  if (page === 'pixel')     loadPixelOffice();
+  if (page === 'evolution') loadEvolution();
+  if (page === 'settings')  loadSettings();
+}
+
+// ── 侧边栏折叠 ───────────────────────────────────────────────────────────────
+function toggleSidebar() {
+  _sidebarCollapsed = !_sidebarCollapsed;
+  const sidebar = document.getElementById('sidebar');
+  const btn = sidebar.querySelector('.sidebar-toggle');
+  sidebar.classList.toggle('collapsed', _sidebarCollapsed);
+  btn.textContent = _sidebarCollapsed ? '▶' : '◀';
+}
+
+// ── 主题 ──────────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  _theme = _theme === 'dark' ? 'light' : 'dark';
+  document.body.classList.toggle('light-theme', _theme === 'light');
+  toast(`已切换到${_theme === 'light' ? '浅色' : '深色'}主题`, 'info', 1500);
+}
+
+// ── 自动刷新 ──────────────────────────────────────────────────────────────────
+function updateRefreshInterval() {
+  if (_refreshTimer) clearInterval(_refreshTimer);
+  const ms = parseInt(document.getElementById('refresh-select').value);
+  if (ms > 0) _refreshTimer = setInterval(() => { navigate(_currentPage); }, ms);
+}
+
+function cycleRefresh() {
+  const opts = ['0', '10000', '30000', '60000', '300000'];
+  const labels = ['手动', '10s', '30s', '1m', '5m'];
+  const sel = document.getElementById('refresh-select');
+  const cur = opts.indexOf(sel.value);
+  const next = (cur + 1) % opts.length;
+  sel.value = opts[next];
+  updateRefreshInterval();
+  toast(`自动刷新：${labels[next]}`, 'info', 1500);
+}
+
+// ── API 请求 ──────────────────────────────────────────────────────────────────
+async function api(path, opts) {
+  try {
+    const r = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+    return r.json();
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function fmt(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const diff = (Date.now() - d) / 1000;
+  if (diff < 60) return `${Math.round(diff)}s前`;
+  if (diff < 3600) return `${Math.round(diff/60)}m前`;
+  if (diff < 86400) return `${Math.round(diff/3600)}h前`;
+  return d.toLocaleDateString();
+}
+
+// ── Gateway 检测 ──────────────────────────────────────────────────────────────
+async function checkGateway() {
+  const d = document.getElementById('gateway-dot');
+  const t = document.getElementById('gateway-text');
+  const res = await api('/api/dashboard/gateway');
+  _gatewayData = res;
+  if (res.online) {
+    d.className = 'online';
+    t.textContent = 'Gateway 在线';
+    document.getElementById('ov-gateway').textContent = '✅ 在线';
+  } else {
+    d.className = 'offline';
+    t.textContent = 'Gateway 离线';
+    document.getElementById('ov-gateway').textContent = '❌ 离线';
+  }
+  // 更新 URL
+  if (res.gatewayUrl) {
+    document.getElementById('ov-gateway-url').textContent = res.gatewayUrl;
+  }
+}
+setInterval(checkGateway, 10000);
+checkGateway();
+
+// ── Gateway Modal ─────────────────────────────────────────────────────────────
+async function showGatewayModal() {
+  document.getElementById('gateway-modal').style.display = 'flex';
+  await refreshGatewayModal();
+}
+async function refreshGatewayModal() {
+  const body = document.getElementById('gateway-modal-body');
+  body.innerHTML = '<div class="loading"><span class="spin">⟳</span> 检测中...</div>';
+  const res = await api('/api/dashboard/gateway');
+  _gatewayData = res;
+  const statusColor = res.online ? 'var(--green)' : 'var(--red)';
+  body.innerHTML = `
+    <div class="gw-stat"><span class="key">状态</span><span style="color:${statusColor};font-weight:600">${res.online ? '🟢 在线' : '🔴 离线'}</span></div>
+    <div class="gw-stat"><span class="key">地址</span><span><code style="font-size:12px">${res.gatewayUrl || '—'}</code></span></div>
+    <div class="gw-stat"><span class="key">版本</span><span>${res.version || '未知'}</span></div>
+    <div class="gw-stat"><span class="key">会话总数</span><span>${res.sessionCount ?? '—'}</span></div>
+    <div class="gw-stat"><span class="key">运行中会话</span><span style="color:var(--green)">${res.runningCount ?? '—'}</span></div>
+    <div class="gw-stat"><span class="key">检测时间</span><span style="color:var(--text2);font-size:12px">${res.checkedAt ? new Date(res.checkedAt).toLocaleTimeString() : '—'}</span></div>
+    ${res.error ? `<div style="margin-top:10px;color:var(--red);font-size:12px;">错误: ${res.error}</div>` : ''}
+  `;
+  // 同步底部指示器
+  const dot = document.getElementById('gateway-dot');
+  const text = document.getElementById('gateway-text');
+  dot.className = res.online ? 'online' : 'offline';
+  text.textContent = res.online ? 'Gateway 在线' : 'Gateway 离线';
+}
+function closeGatewayModal(e) {
+  if (e && e.target !== document.getElementById('gateway-modal')) return;
+  document.getElementById('gateway-modal').style.display = 'none';
+}
+
+// ── 同步版本号 ────────────────────────────────────────────────────────────────
+async function syncVersion() {
+  const res = await api('/health');
+  if (res && res.version) {
+    document.getElementById('sidebar-version').textContent = `控制中心 v${res.version}`;
+  }
+}
+syncVersion();
+
+// ── 总览 ──────────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  const btn = document.getElementById('btn-refresh-overview');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ 刷新中'; }
+  try {
+    const [snap, usage] = await Promise.all([
+      api('/api/dashboard/snapshot'),
+      api('/api/dashboard/usage?period=7d'),
+    ]);
+
+    document.getElementById('ov-sessions').textContent = snap.sessions?.length ?? '—';
+    document.getElementById('ov-tokens').textContent   = fmt(usage.todayTokens ?? 0);
+
+    // Agent 数量
+    const agentsRes = await api('/api/dashboard/agents');
+    document.getElementById('ov-agents').textContent = agentsRes.agents?.length ?? '—';
+
+    // Alerts
+    const wrap = document.getElementById('overview-alerts-wrap');
+    if (snap.alerts?.length > 0) {
+      wrap.style.display = '';
+      wrap.querySelector('#overview-alerts').innerHTML = snap.alerts.map(a =>
+        `<div style="padding:10px 16px;background:${a.level==='error'?'rgba(248,113,113,.1)':'rgba(251,191,36,.1)'};border-bottom:1px solid var(--border);font-size:13px;">
+          <span style="color:${a.level==='error'?'var(--red)':'var(--yellow)'}">● </span>${a.message}
+        </div>`
+      ).join('');
+    } else {
+      wrap.style.display = 'none';
+    }
+
+    // Mini chart
+    if (usage.daily) {
+      const max = Math.max(...usage.daily.map(d => d.tokens), 1);
+      document.getElementById('mini-chart').innerHTML = usage.daily.map(d => {
+        const h = Math.round((d.tokens / max) * 100);
+        return `<div class="chart-col">
+          <div class="chart-bar" style="height:${Math.max(h,2)}%" title="${d.day}: ${fmt(d.tokens)} tokens"></div>
+          <span class="chart-label">${d.day.slice(5)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // Digest
+    if (snap.digest) {
+      document.getElementById('overview-digest').style.display = '';
+      document.getElementById('digest-content').textContent = snap.digest;
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ 刷新'; }
+  }
+}
+
+// ── Agents ────────────────────────────────────────────────────────────────────
+async function loadAgents() {
+  const grid = document.getElementById('agents-grid');
+  grid.innerHTML = '<div class="loading"><span class="spin">⟳</span> 加载中...</div>';
+  const res = await api('/api/dashboard/agents');
+  if (!res.agents?.length) {
+    grid.innerHTML = '<div class="empty">暂无 Agent 配置</div>';
+    return;
+  }
+  grid.innerHTML = res.agents.map(a => `
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <div class="agent-emoji">${a.emoji || '🤖'}</div>
+        <div class="agent-info">
+          <h3>${a.label || a.id}</h3>
+          <div class="model">${a.model || '未指定模型'}</div>
+        </div>
+      </div>
+      <div class="agent-meta">
+        <span class="badge ${a.state}">${a.state === 'running' ? '🟢 运行中' : '⚫ 空闲'}</span>
+        <span class="badge">${a.sessionCount || 0} 会话</span>
+        ${(a.platforms || []).map(p => `<span class="badge">${p}</span>`).join('')}
+        ${a.isLive ? '<span class="badge running">实时</span>' : ''}
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-top:10px;">最后活动: ${timeAgo(a.lastActivity)}</div>
+    </div>
+  `).join('');
+}
+
+// ── Models ────────────────────────────────────────────────────────────────────
+async function loadModels() {
+  const tbody = document.getElementById('models-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="loading">加载中...</td></tr>';
+  const res = await api('/api/models');
+  if (!res.providers?.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">无模型数据</td></tr>';
+    return;
+  }
+  const rows = [];
+  res.providers.forEach(p => {
+    (p.models || []).forEach((m, i) => {
+      const isActive = p.id === res.active;
+      rows.push(`<tr>
+        <td>${i === 0 ? `<strong>${p.name}</strong>` : ''}</td>
+        <td><code style="font-size:11px">${m.id}</code></td>
+        <td>${m.name}</td>
+        <td><span class="badge ${isActive ? 'running' : ''}">${isActive ? '✅ 激活' : '—'}</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="setActiveModel('${p.id}')" ${isActive ? 'disabled' : ''}>${isActive ? '当前' : '设为激活'}</button></td>
+      </tr>`);
+    });
+  });
+  tbody.innerHTML = rows.join('') || '<tr><td colspan="5" class="empty">暂无模型</td></tr>';
+
+  document.getElementById('model-health-btns').innerHTML =
+    `<button class="btn btn-ghost" id="btn-model-health" onclick="runModelHealth()">🏥 运行模型健康检测</button>`;
+}
+
+async function setActiveModel(providerId) {
+  const res = await api('/api/models/active', { method: 'POST', body: JSON.stringify({ provider: providerId }) });
+  if (res.ok) {
+    toast(`已切换到 ${providerId}`, 'success');
+    loadModels();
+  } else {
+    toast(`切换失败: ${res.error}`, 'error');
+  }
+}
+
+async function runModelHealth() {
+  const btn = document.getElementById('btn-model-health');
+  if (btn) { btn.disabled = true; btn.textContent = '检测中...'; }
+  const resultEl = document.getElementById('model-health-result');
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<div class="inline-result info"><span class="spin">⟳</span> 健康检测中，请稍候...</div>';
+  try {
+    const res = await api('/api/models/health', { method: 'POST', body: '{}' });
+    if (res.results) {
+      const allOk = res.results.every(r => r.ok);
+      const rows = res.results.map(r =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">
+          <span>${r.ok ? '✅' : '❌'}</span>
+          <span style="font-weight:600;min-width:100px">${r.provider}</span>
+          <span style="font-size:11px;color:var(--text2)">${r.model || ''}</span>
+          ${r.latencyMs ? `<span style="margin-left:auto;color:var(--text2);font-size:11px">${r.latencyMs}ms</span>` : ''}
+          ${r.error ? `<span style="color:var(--red);font-size:11px">${r.error}</span>` : ''}
+        </div>`
+      ).join('');
+      resultEl.innerHTML = `<div class="inline-result ${allOk ? 'success' : 'error'}">
+        <strong>健康检测结果</strong>
+        <div style="margin-top:8px;">${rows}</div>
+      </div>`;
+    } else {
+      resultEl.innerHTML = `<div class="inline-result error">检测失败: ${res.error || '无响应'}</div>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="inline-result error">网络错误: ${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🏥 运行模型健康检测'; }
+  }
+}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+async function loadSessions() {
+  const tbody = document.getElementById('sessions-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">加载中...</td></tr>';
+  const type = document.getElementById('session-type-filter').value;
+  const res = await api(`/api/dashboard/sessions?type=${type}`);
+  if (!res.sessions?.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无会话数据</td></tr>';
+    return;
+  }
+  tbody.innerHTML = res.sessions.map(s => `
+    <tr>
+      <td><code style="font-size:11px">${(s.id||'').slice(0,16)}...</code></td>
+      <td>${s.agentId || '—'}</td>
+      <td><span class="badge">${s.type === 'group' ? '👥 群聊' : s.type === 'scheduled' ? '⏰ 定时' : '💬 私聊'}</span></td>
+      <td>${s.messageCount || 0}</td>
+      <td>${fmt(s.totalTokens || 0)}</td>
+      <td>${timeAgo(s.lastUpdated)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="testSession('${s.id}', this)">🔌 测试</button></td>
+    </tr>
+  `).join('');
+}
+
+async function testSession(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '测试中...'; }
+  const res = await api(`/api/dashboard/sessions/${id}/test`, { method: 'POST', body: '{}' });
+  if (btn) { btn.disabled = false; btn.textContent = '🔌 测试'; }
+  if (res.ok) {
+    toast(`会话 ${id.slice(0,8)}... 连通正常${res.latencyMs ? ` (${res.latencyMs}ms)` : ''}`, 'success');
+  } else {
+    toast(`会话测试失败: ${res.message || res.error || '连接超时'}`, 'error');
+  }
+}
+
+async function testAllPlatforms() {
+  const btn = document.getElementById('btn-platform-test');
+  if (btn) { btn.disabled = true; btn.textContent = '测试中...'; }
+  const res = await api('/api/dashboard/platform-test', {
+    method: 'POST',
+    body: JSON.stringify({ platforms: ['feishu', 'discord', 'telegram', 'dm'] })
+  });
+  if (btn) { btn.disabled = false; btn.textContent = '🔌 平台测试'; }
+  const wrap = document.getElementById('platform-test-result');
+  wrap.style.display = '';
+  const allOk = Object.values(res.results || {}).every(r => r.ok);
+  wrap.innerHTML = `<div class="inline-result ${allOk ? 'success' : 'error'}">
+    <strong style="display:block;margin-bottom:10px;font-size:13px">平台连通测试结果</strong>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    ${Object.entries(res.results || {}).map(([p, r]) =>
+      `<div class="badge ${r.ok ? 'running' : 'error'}" style="padding:4px 10px;font-size:12px;">
+        <strong>${p}</strong>: ${r.ok ? '✅' : '❌'} ${r.message}
+      </div>`
+    ).join('')}
+    </div>
+  </div>`;
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  const period = document.getElementById('period-select').value;
+  const res = await api(`/api/dashboard/stats?period=${period}`);
+  if (!res.ok) return;
+
+  document.getElementById('s-total').textContent = fmt(res.summary?.totalTokens || 0);
+  document.getElementById('s-rt').textContent    = (res.summary?.avgResponseMs || 0) + ' ms';
+  document.getElementById('s-peak').textContent  = res.summary?.peakDay?.date || '—';
+
+  renderBarChart('token-chart', res.tokenTrend || [], 'tokens');
+  renderBarChart('rt-chart',    res.rtTrend    || [], 'avgMs', '#5b8af7');
+}
+
+function renderBarChart(id, data, key, color) {
+  const max = Math.max(...data.map(d => d[key] || 0), 1);
+  const el  = document.getElementById(id);
+  el.innerHTML = data.map(d => {
+    const h = Math.round(((d[key] || 0) / max) * 100);
+    return `<div class="chart-col">
+      <div class="chart-bar" style="height:${Math.max(h,2)}%;background:${color||'var(--accent)'}" title="${d.label}: ${fmt(d[key]||0)}"></div>
+      <span class="chart-label">${d.label}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Skills ────────────────────────────────────────────────────────────────────
+async function loadSkills() {
+  const search = document.getElementById('skill-search').value;
+  const type   = document.getElementById('skill-type-filter').value;
+  const res    = await api(`/api/dashboard/skills?search=${encodeURIComponent(search)}&type=${type}`);
+
+  const summary = res.summary || {};
+  document.getElementById('skills-summary').innerHTML = [
+    `<div class="badge">全部 <strong>${summary.total||0}</strong></div>`,
+    `<div class="badge">内置 <strong>${summary.builtin||0}</strong></div>`,
+    `<div class="badge">扩展 <strong>${summary.extension||0}</strong></div>`,
+    `<div class="badge">自定义 <strong>${summary.custom||0}</strong></div>`,
+  ].join('');
+
+  const list = document.getElementById('skills-list');
+  if (!res.skills?.length) {
+    list.innerHTML = '<div class="empty">暂无技能数据</div>';
+    return;
+  }
+  const icons = { builtin: '⚙️', extension: '🔌', custom: '✨' };
+  list.innerHTML = res.skills.map(s => `
+    <div class="skill-item" data-skill-id="${s.id}">
+      <div class="skill-left">
+        <div class="skill-icon">${icons[s.type] || '🔧'}</div>
+        <div>
+          <div class="skill-name">${s.name}</div>
+          <div class="skill-desc">${s.description || s.category || ''} ${s.version ? `· v${s.version}` : ''}</div>
+        </div>
+      </div>
+      <button class="toggle-btn ${s.enabled ? 'on' : 'off'}" onclick="toggleSkill('${s.id}', ${s.enabled}, this)">${s.enabled ? '已启用' : '已禁用'}</button>
+    </div>
+  `).join('');
+}
+
+async function toggleSkill(id, currentEnabled, btn) {
+  btn.disabled = true;
+  btn.textContent = '处理中...';
+  const newEnabled = !currentEnabled;
+  const res = await api(`/api/dashboard/skills/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ enabled: newEnabled })
+  });
+  btn.disabled = false;
+  if (res.ok !== false) {
+    // 更新按钮状态
+    btn.className = `toggle-btn ${newEnabled ? 'on' : 'off'}`;
+    btn.textContent = newEnabled ? '已启用' : '已禁用';
+    btn.setAttribute('onclick', `toggleSkill('${id}', ${newEnabled}, this)`);
+    toast(`技能已${newEnabled ? '启用' : '禁用'}`, 'success', 2000);
+  } else {
+    // 恢复原状
+    btn.className = `toggle-btn ${currentEnabled ? 'on' : 'off'}`;
+    btn.textContent = currentEnabled ? '已启用' : '已禁用';
+    toast(`操作失败: ${res.error || '接口暂不支持'}`, 'warn', 3000);
+  }
+}
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+async function loadAlerts() {
+  const res = await api('/api/dashboard/alerts');
+  const tbody = document.getElementById('alert-rules-tbody');
+  const conditionLabels = {
+    model_unavailable: '模型不可用', bot_unresponsive: '机器人无响应',
+    gateway_offline: 'Gateway 离线', high_token_usage: 'Token 用量高', error_rate_high: '错误率高'
+  };
+  if (!res.rules?.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">暂无告警规则</td></tr>';
+  } else {
+    tbody.innerHTML = res.rules.map(r => `<tr>
+      <td><strong>${r.name}</strong></td>
+      <td>${conditionLabels[r.condition] || r.condition}</td>
+      <td>${r.channel}</td>
+      <td><span class="badge ${r.enabled ? 'running' : ''}"><span style="font-size:10px">${r.enabled ? '✅' : '⏸'}</span> ${r.enabled ? '启用' : '禁用'}</span></td>
+      <td style="font-size:11px;color:var(--text2)">${new Date(r.createdAt).toLocaleDateString()}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="testAlertRule('${r.id}', this)">测试</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAlertRule('${r.id}', this)">删除</button>
+      </td>
+    </tr>`).join('');
+  }
+
+  // History
+  const histEl = document.getElementById('alert-history-list');
+  if (!res.history?.length) {
+    histEl.innerHTML = '<div class="empty">暂无触发历史</div>';
+  } else {
+    histEl.innerHTML = res.history.slice().reverse().map(h => `
+      <div class="alert-history-item">
+        <div class="alert-dot ${h.type === 'test' ? 'test' : 'error'}"></div>
+        <div style="flex:1;font-size:12px">${h.message}</div>
+        <div style="color:var(--text2);font-size:11px">${timeAgo(h.triggeredAt)}</div>
+      </div>
+    `).join('');
+  }
+}
+
+async function addAlertRule() {
+  const btn = document.getElementById('btn-add-alert');
+  const name      = document.getElementById('alert-name').value.trim();
+  const condition = document.getElementById('alert-condition').value;
+  const channel   = document.getElementById('alert-channel').value;
+  if (!name) { toast('请输入规则名称', 'warn'); document.getElementById('alert-name').focus(); return; }
+  btn.disabled = true; btn.textContent = '添加中...';
+  const res = await api('/api/dashboard/alerts', {
+    method: 'POST',
+    body: JSON.stringify({ name, condition, channel })
+  });
+  btn.disabled = false; btn.textContent = '+ 添加';
+  if (res.ok) {
+    document.getElementById('alert-name').value = '';
+    toast(`告警规则「${name}」已添加`, 'success');
+    loadAlerts();
+  } else {
+    toast(`添加失败: ${res.error}`, 'error');
+  }
+}
+
+async function deleteAlertRule(id, btn) {
+  const confirmed = await showConfirm('删除告警规则', '确认删除此告警规则？此操作不可恢复。', '删除', 'btn-danger');
+  if (!confirmed) return;
+  if (btn) { btn.disabled = true; }
+  const res = await api('/api/dashboard/alerts/' + id, { method: 'DELETE' });
+  if (res.ok) {
+    toast('告警规则已删除', 'success');
+    loadAlerts();
+  } else {
+    toast('删除失败: ' + (res.error || '未知错误'), 'error');
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+async function testAlertRule(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '测试中...'; }
+  const res = await api(`/api/dashboard/alerts/${id}/test`, { method: 'POST', body: '{}' });
+  if (btn) { btn.disabled = false; btn.textContent = '测试'; }
+  if (res.ok) {
+    toast('✅ 测试告警已记录', 'success');
+    loadAlerts();
+  } else {
+    toast('测试失败: ' + (res.error || '未知错误'), 'error');
+  }
+}
+
+// ── Pixel Office ──────────────────────────────────────────────────────────────
+let _pixelTimer = null;
+
+async function loadPixelOffice() {
+  const res = await api('/api/dashboard/pixel-office');
+  if (!res.ok) return;
+
+  const agentsLayer    = document.getElementById('pixel-agents-layer');
+  const furnitureLayer = document.getElementById('pixel-furniture-layer');
+  const infoEl         = document.getElementById('pixel-info');
+
+  // 渲染家具
+  furnitureLayer.innerHTML = (res.furniture || []).map(f =>
+    `<div class="pixel-furniture" style="left:${f.x}%;top:${f.y}%;" title="${f.type}">${f.emoji}</div>`
+  ).join('');
+
+  // 渲染 Agent
+  function renderAgents(agents) {
+    agentsLayer.innerHTML = (agents || []).map(a =>
+      `<div class="pixel-agent ${a.state}" style="left:${a.position.x}%;top:${a.position.y}%;" title="${a.name} | ${a.model || ''} | ${a.state}">
+        ${a.emoji || '🤖'}
+        <div class="pixel-name">${a.name}</div>
+      </div>`
+    ).join('');
+  }
+  renderAgents(res.agents);
+
+  // 动态移动
+  if (_pixelTimer) clearInterval(_pixelTimer);
+  let agentPositions = (res.agents || []).map(a => ({ ...a }));
+  _pixelTimer = setInterval(() => {
+    agentPositions = agentPositions.map(a => {
+      if (a.state !== 'running' && Math.random() > 0.3) return a;
+      return {
+        ...a,
+        position: {
+          x: Math.min(90, Math.max(5, a.position.x + (Math.random() - 0.5) * 15)),
+          y: Math.min(85, Math.max(10, a.position.y + (Math.random() - 0.5) * 10)),
+        }
+      };
+    });
+    renderAgents(agentPositions);
+  }, 2000);
+
+  infoEl.innerHTML = `
+    <div class="stat-card">
+      <div class="label">办公室名称</div>
+      <div class="value" style="font-size:16px">${res.officeInfo?.name || 'QClaw 像素办公室'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">工作中</div>
+      <div class="value">${res.officeInfo?.activeCount || 0}</div>
+      <div class="sub">/ ${res.officeInfo?.totalCount || 0} 个 Agent</div>
+    </div>
+  `;
+}
+
+// ── Evolution Center ──────────────────────────────────────────────────────────
+
+function _evoProgress(show, text) {
+  const el = document.getElementById('evo-progress');
+  if (!el) return;
+  if (show) {
+    document.getElementById('evo-progress-text').textContent = ' ' + (text || '处理中...');
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function _evoLogScrollToBottom() {
+  const logEl = document.getElementById('evo-log-list');
+  const autoScroll = document.getElementById('evo-log-autoscroll');
+  if (logEl && autoScroll && autoScroll.checked) {
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+}
+
+async function loadEvolution() {
+  const [status, logRes, histRes, scanRes, adviceRes] = await Promise.all([
+    api('/api/evolution/status'),
+    api('/api/evolution/log?n=50'),
+    api('/api/evolution/history?n=20'),
+    api('/api/evolution/scan-results'),
+    api('/api/evolution/advice'),
+  ]);
+
+  // ── 状态卡片 ──
+  if (status && !status.error) {
+    const s = status.state || {};
+    const running = status.running;
+    document.getElementById('evo-running').textContent = running ? '✅ 运行中' : '⏹ 已停止';
+    document.getElementById('evo-running').style.color = running ? 'var(--green)' : 'var(--red)';
+    document.getElementById('evo-version').textContent = '版本 ' + (status.version || '—');
+    document.getElementById('evo-scans').textContent = s.totalScans ?? '0';
+    document.getElementById('evo-last-scan').textContent = s.lastScanAt ? '上次: ' + timeAgo(new Date(s.lastScanAt).toISOString()) : '尚未扫描';
+    document.getElementById('evo-issues').textContent = s.pendingIssues ?? '0';
+    document.getElementById('evo-patches').textContent = `已打补丁: ${s.totalPatches ?? 0} 次 / 回滚: ${s.totalRollbacks ?? 0}`;
+    document.getElementById('evo-backups').textContent = status.backupCount ?? '0';
+    const btn = document.getElementById('evo-toggle-btn');
+    if (btn) btn.textContent = running ? '⏸ 停止引擎' : '▶ 启动引擎';
+    const cb = document.getElementById('evo-auto-patch');
+    if (cb && status.config) cb.checked = !!status.config.autoPatchEnabled;
+  }
+
+  renderEvoIssues(scanRes?.results?.issues ?? null);
+  renderEvoAdvice(adviceRes?.advice ?? null);
+
+  // ── 进化历史 ──
+  const tbody = document.getElementById('evo-history-tbody');
+  const hist = histRes?.history || [];
+  if (!hist.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">暂无进化历史</td></tr>';
+  } else {
+    tbody.innerHTML = hist.map(h => `<tr>
+      <td><span class="badge running">v${h.version}</span></td>
+      <td style="font-size:11px;color:var(--text2)">${timeAgo(h.iso)}</td>
+      <td style="font-size:12px">${h.summary || '—'}</td>
+    </tr>`).join('');
+  }
+
+  // ── 进化日志（自动滚动到底部）──
+  const logEl = document.getElementById('evo-log-list');
+  const logs = logRes?.log || [];
+  if (!logs.length) {
+    logEl.innerHTML = '<div class="empty">暂无日志</div>';
+  } else {
+    logEl.innerHTML = logs.map(entry => {
+      const ts = new Date(entry.ts).toLocaleTimeString();
+      const cls = entry.level === 'fix' ? 'evo-log-fix' : entry.level === 'error' ? 'evo-log-err' : entry.level === 'warn' ? 'evo-log-warn' : '';
+      return `<div class="evo-log-entry">
+        <span class="evo-log-ts">${ts}</span>
+        <span class="evo-log-type">[${entry.type}]</span>
+        <span class="${cls}">${entry.action}: ${entry.detail}</span>
+      </div>`;
+    }).join('');
+    _evoLogScrollToBottom();
+  }
+}
+
+function renderEvoIssues(issues) {
+  const el = document.getElementById('evo-issues-list');
+  const badge = document.getElementById('evo-issues-badge');
+  if (!issues || !issues.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--text2)">无问题 ✅</div>';
+    if (badge) badge.textContent = '(0)';
+    return;
+  }
+  if (badge) badge.textContent = `(${issues.length} 条)`;
+  const typeLabels = {
+    large_function: '大函数', empty_catch: '空 catch', todo_marker: 'TODO',
+    hardcoded_url: '硬编码地址', var_keyword: 'var 关键字',
+    missing_header: '缺少注释', potential_memory_leak: '内存泄漏风险'
+  };
+  el.innerHTML = issues.slice(0, 30).map(i => `
+    <div class="evo-issue-item">
+      <span class="evo-severity-${i.severity}">${i.severity === 'warn' ? '⚠️' : 'ℹ️'}</span>
+      <div style="flex:1;">
+        <div style="font-weight:600;color:var(--text)">${typeLabels[i.type] || i.type}</div>
+        <div style="color:var(--text2)">${i.file} ${i.line ? `L${i.line}` : ''}</div>
+        <div style="color:var(--text);margin-top:2px">${i.message}</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderEvoAdvice(advice) {
+  const el = document.getElementById('evo-advice-list');
+  const badge = document.getElementById('evo-advice-badge');
+  if (!advice || !advice.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--text2)">暂无建议</div>';
+    if (badge) badge.textContent = '';
+    return;
+  }
+  if (badge) badge.textContent = `(${advice.length} 条)`;
+  el.innerHTML = advice.map(a => `
+    <div class="evo-advice-item evo-priority-${a.priority || 'medium'}">
+      <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+          <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg3);color:var(--text2)">${a.priority?.toUpperCase() || 'MEDIUM'}</span>
+          <span style="font-size:11px;color:var(--text2)">${a.file || ''}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text)">${a.advice}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function triggerEvoScan() {
+  const btn = document.getElementById('evo-scan-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '扫描中...'; }
+  _evoProgress(true, '正在扫描所有 JS 文件...');
+  try {
+    const res = await api('/api/evolution/scan', { method: 'POST', body: '{}' });
+    if (res.ok) {
+      _evoProgress(false);
+      await loadEvolution();
+      const issueCount = res.result?.stats?.issues || 0;
+      toast(`扫描完成，发现 ${issueCount} 个问题`, issueCount > 0 ? 'warn' : 'success');
+    } else {
+      _evoProgress(true, '❌ 扫描失败: ' + (res.error || '未知错误'));
+      toast('扫描失败: ' + (res.error || '未知错误'), 'error');
+      setTimeout(() => _evoProgress(false), 3000);
+    }
+  } catch (e) {
+    _evoProgress(true, '❌ 网络错误: ' + e.message);
+    toast('网络错误: ' + e.message, 'error');
+    setTimeout(() => _evoProgress(false), 3000);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 立即扫描'; }
+  }
+}
+
+async function triggerEvoEvolve() {
+  const confirmed = await showConfirm(
+    '触发进化周期',
+    '触发进化周期将扫描代码并（如开启自动补丁）尝试自动修复问题，确认执行？',
+    '⚡ 执行进化',
+    'btn-primary'
+  );
+  if (!confirmed) return;
+  const btn = document.getElementById('evo-evolve-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '进化中...'; }
+  _evoProgress(true, '⚡ 进化周期执行中，请稍候...');
+  try {
+    const res = await api('/api/evolution/evolve', { method: 'POST', body: '{}' });
+    if (res.ok) {
+      _evoProgress(false);
+      toast('✅ 进化完成！' + (res.result?.summary ? ` ${res.result.summary}` : ''), 'success', 5000);
+      loadEvolution();
+    } else {
+      _evoProgress(true, '❌ 进化失败: ' + (res.error || ''));
+      toast('进化失败: ' + (res.error || '未知错误'), 'error');
+      setTimeout(() => _evoProgress(false), 4000);
+    }
+  } catch (e) {
+    _evoProgress(true, '❌ ' + e.message);
+    toast('网络错误: ' + e.message, 'error');
+    setTimeout(() => _evoProgress(false), 4000);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ 触发进化'; }
+  }
+}
+
+async function toggleEvolution() {
+  const btn = document.getElementById('evo-toggle-btn');
+  if (btn) { btn.disabled = true; }
+  const status = await api('/api/evolution/status');
+  const running = status && status.running;
+  const res = await api('/api/evolution/toggle', { method: 'POST', body: JSON.stringify({ enabled: !running }) });
+  if (btn) { btn.disabled = false; }
+  if (res.ok) {
+    toast(`引擎已${!running ? '启动' : '停止'}`, 'success');
+    loadEvolution();
+  } else {
+    toast('切换失败: ' + (res.error || ''), 'error');
+  }
+}
+
+async function updateEvoPatch() {
+  const enabled = document.getElementById('evo-auto-patch').checked;
+  const res = await api('/api/evolution/config', { method: 'PUT', body: JSON.stringify({ autoPatchEnabled: enabled }) });
+  if (res.ok !== false) {
+    toast(`自动补丁已${enabled ? '开启' : '关闭'}`, 'info', 2000);
+  }
+}
+
+// ── 键盘快捷键 ────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  // Ctrl+B: 折叠侧边栏
+  if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); return; }
+  // Ctrl+D: 切换主题
+  if (e.ctrlKey && e.key === 'd') { e.preventDefault(); toggleTheme(); return; }
+  // Escape: 关闭所有 Modal
+  if (e.key === 'Escape') {
+    document.getElementById('gateway-modal').style.display = 'none';
+    confirmModalCancel({target: document.getElementById('confirm-modal')});
+    return;
+  }
+  // 数字键 1-9: 导航
+  if (!e.ctrlKey && !e.altKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+    const pages = ['overview','agents','models','sessions','stats','skills','alerts','pixel','evolution'];
+    const idx = parseInt(e.key) - 1;
+    if (idx >= 0 && idx < pages.length) { navigate(pages[idx]); }
+  }
+});
+
+// ── 初始化 ────────────────────────────────────────────────────────────────────
+loadOverview();
+updateRefreshInterval();
+</script>
+</body>
+</html>

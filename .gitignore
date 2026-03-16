@@ -1,0 +1,47 @@
+# ===== 调试/临时脚本 =====
+resources/_*.js
+resources/_*.bat
+_*.js
+_*.ps1
+_*.bat
+_*.txt
+_*.zip
+_*.exe
+_*.msi
+_*.7z
+
+# ===== 备份文件 =====
+resources/app.asar.bak
+resources/app.asar.bak2
+*.bak
+*.bak2
+*.old
+
+# ===== 日志文件 =====
+*.log
+debug.log
+
+# ===== 不需要上传的大型二进制 =====
+# QClaw.exe 单独作为 Release 附件上传
+QClaw.exe
+d3dcompiler_47.dll
+ffmpeg.dll
+libEGL.dll
+libGLESv2.dll
+snapshot_blob.bin
+v8_context_snapshot.bin
+vk_swiftshader_icd.json
+chrome_100_percent.pak
+chrome_200_percent.pak
+resources.pak
+icudtl.dat
+LICENSE.electron.txt
+LICENSES.chromium.html
+
+# ===== node_modules (服务器依赖 npm install 重建) =====
+resources/server/node_modules/
+
+# ===== 系统文件 =====
+Thumbs.db
+.DS_Store
+desktop.ini

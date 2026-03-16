@@ -1,0 +1,7 @@
+const mcp = require('./services/mcp-client')
+console.log('[OK] MCPManager loaded')
+console.log('[OK] startServer:', typeof mcp.startServer)
+console.log('[OK] stopServer:', typeof mcp.stopServer)
+console.log('[OK] callTool:', typeof mcp.callTool)
+console.log('[OK] getStatus:', typeof mcp.getStatus)
+console.log('[OK] getAllTools:', typeof mcp.getAllTools)

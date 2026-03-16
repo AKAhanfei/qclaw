@@ -1,0 +1,19 @@
+{
+  "knowledge-base": {
+    "enabled": true,
+    "installedAt": "2026-03-16T14:28:15.113Z",
+    "userConfig": {
+      "chunkSize": 500,
+      "topK": 3,
+      "threshold": 0.7
+    }
+  },
+  "web-search": {
+    "enabled": true,
+    "installedAt": "2026-03-16T14:28:35.224Z",
+    "userConfig": {
+      "engine": "duckduckgo",
+      "maxResults": 5
+    }
+  }
+}

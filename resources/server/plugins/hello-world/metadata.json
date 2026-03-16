@@ -1,0 +1,27 @@
+{
+  "id": "hello-world",
+  "name": "Hello World 示例",
+  "version": "1.0.0",
+  "description": "QClaw 文件插件开发示例，展示插件 API 的基本用法",
+  "author": "QClaw Team",
+  "category": "示例",
+  "icon": "👋",
+  "color": "#4ec9b0",
+  "tags": ["示例", "入门", "开发"],
+  "stars": 99,
+  "downloads": 500,
+  "hooks": ["onSystemPrompt", "onLLMResponse"],
+  "config": {
+    "greeting": {
+      "type": "text",
+      "label": "问候语",
+      "default": "你好！"
+    },
+    "enableSignature": {
+      "type": "boolean",
+      "label": "在回复末尾添加署名",
+      "default": false
+    }
+  },
+  "readme": "# Hello World 示例插件\n\n这是一个 QClaw 文件插件的最小示例。\n\n## 钩子说明\n\n- `onSystemPrompt`：在 System Prompt 中追加问候语\n- `onLLMResponse`：可选在回复末尾添加署名\n\n## 开发参考\n\n复制此目录，修改 `metadata.json` 和 `main.js` 即可开发自己的插件。"
+}

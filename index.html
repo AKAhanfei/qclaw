@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QClaw</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #11111b; }
+      body { display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #cdd6f4; }
+      .logo { font-size: 48px; margin-bottom: 16px; }
+      .title { font-size: 28px; font-weight: 700; color: #cba6f7; margin-bottom: 8px; }
+      .version { font-size: 14px; color: #6c7086; margin-bottom: 32px; }
+      .spinner { width: 32px; height: 32px; border: 3px solid #313244; border-top-color: #cba6f7; border-radius: 50%; animation: spin 0.8s linear infinite; }
+      .status { margin-top: 16px; font-size: 13px; color: #9399b2; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="logo">🦞</div>
+    <div class="title">QClaw</div>
+    <div class="version">v2.0.1</div>
+    <div class="spinner"></div>
+    <div class="status">正在启动服务...</div>
+  </body>
+</html>

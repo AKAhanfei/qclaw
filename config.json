@@ -1,0 +1,9 @@
+{
+  "version": "2.0.1",
+  "current_version": "2.0.1",
+  "app_name": "QClaw",
+  "force_check": true,
+  "last_evolved": "2026-03-16T00:00:00.000Z",
+  "last_fixed": "2026-03-16T12:00:00.000Z",
+  "fix_notes": "app.asar restored from bak2 backup"
+}
